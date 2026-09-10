@@ -1,0 +1,10 @@
+[Unit]
+Description=Poll for a gap in recording to restart twitch-recorder
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=2min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

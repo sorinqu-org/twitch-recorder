@@ -197,3 +197,60 @@ sudo systemctl restart twitch-recorder
 `ReadWritePaths` в drop-in **добавляется** к списку из основного юнита, а не
 заменяет его - оба пути (данные `twitch-recorder` и данные StreamSlice)
 остаются доступны на запись.
+
+## Обновление кода без потери записи
+
+Рестарт сервиса убивает `streamlink` и обрывает сегмент, который в этот момент
+пишет `ffmpeg`. Обрезанный файл обычно не проигрывается, `valid_mp4()` его
+отбраковывает, и после `INVALID_QUARANTINE_THRESHOLD` проверок чанк уходит в
+карантин. То есть рестарт посреди часового чанка стоит до часа записи.
+
+Поэтому обновление выкладывается в два шага: сначала файлы, потом рестарт в
+момент, когда ни один стрим не пишется.
+
+```bash
+# 1. Выложить код (сервис продолжает работать на старом, уже загруженном в память)
+scp twitch_recorder.py root@HOST:/root/twitch-downloader/
+
+# 2. Поставить отложенный рестарт
+scp deploy/deferred-restart.sh root@HOST:/usr/local/bin/twitch-recorder-deferred-restart
+scp deploy/twitch-recorder-deferred-restart.{service,timer} root@HOST:/etc/systemd/system/
+ssh root@HOST 'chmod +x /usr/local/bin/twitch-recorder-deferred-restart \
+  && systemctl daemon-reload \
+  && systemctl enable --now twitch-recorder-deferred-restart.timer'
+```
+
+Таймер опрашивает состояние каждые 2 минуты. Как только запись прекращается,
+он перезапускает `twitch-recorder` и отключает сам себя.
+
+Наличие записи определяется по процессам **внутри cgroup сервиса**:
+
+```
+/sys/fs/cgroup/system.slice/twitch-recorder.service/cgroup.procs
+```
+
+Именно cgroup, а не `pgrep -f streamlink`: поиск по командной строке
+срабатывает и на посторонней оболочке, в которой эта строка просто упомянута
+(например на вашей же ssh-команде), и тогда рестарт откладывается навсегда.
+
+Проверить, что механизм видит запись:
+
+```bash
+ssh root@HOST /usr/local/bin/twitch-recorder-deferred-restart
+# recording in progress, deferring restart   — стрим пишется, рестарт отложен
+# no active recording, restarting ...        — рестарт выполнен, таймер отключён
+```
+
+Состояние таймера и журнал:
+
+```bash
+systemctl list-timers twitch-recorder-deferred-restart
+journalctl -u twitch-recorder-deferred-restart -n 20
+```
+
+Если запись ждать некогда, рестарт делается вручную — с осознанной потерей
+текущих незакрытых чанков:
+
+```bash
+systemctl restart twitch-recorder
+```

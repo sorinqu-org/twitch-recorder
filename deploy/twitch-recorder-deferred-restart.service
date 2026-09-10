@@ -1,0 +1,6 @@
+[Unit]
+Description=Restart twitch-recorder once no stream is being recorded
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/twitch-recorder-deferred-restart
