@@ -1,0 +1,32 @@
+[Unit]
+Description=Twitch stream recorder and uploader
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=twitch-recorder
+Group=twitch-recorder
+
+# Adjust these two paths to match your install (see docs/DEPLOYMENT.md).
+# install.sh fills them in automatically.
+WorkingDirectory=/opt/twitch-recorder
+ExecStart=/opt/twitch-recorder/.venv/bin/python /opt/twitch-recorder/twitch_recorder.py --config /etc/twitch-recorder/config.yaml
+
+Restart=always
+RestartSec=15
+TimeoutStopSec=90
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+# ProtectSystem=strict makes the whole filesystem read-only for this unit
+# except for the paths explicitly listed in ReadWritePaths. If you relocate
+# download_directory, rclone.config or the credentials file outside of the
+# paths below, add them here too, or the service will fail with permission
+# errors instead of a clean config error.
+ProtectSystem=strict
+ReadWritePaths=/var/lib/twitch-recorder /etc/twitch-recorder
+
+[Install]
+WantedBy=multi-user.target

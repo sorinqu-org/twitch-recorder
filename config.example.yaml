@@ -1,0 +1,60 @@
+# Example configuration for twitch_recorder.py.
+# Copy this file to config.yaml (kept out of version control, see .gitignore)
+# and adjust paths, channels and quality to your deployment.
+#
+# Full description of every key: docs/CONFIGURATION.md
+
+twitch:
+  # Path to a separate file holding Twitch credentials, so this file can be
+  # committed/shared without secrets. See credentials.example.yaml.
+  # Remove this key and set client_id/client_secret/oauth_token here directly
+  # if you prefer a single file.
+  credentials_file: /etc/twitch-recorder/twitch-credentials.yaml
+
+# Twitch login names (lowercase) to watch. Recording starts automatically
+# when a channel goes live and stops when it goes offline.
+channels:
+  - some_streamer
+  - another_streamer
+
+# Where chunk_N.mp4 files are written, one subfolder per channel and stream.
+download_directory: /var/lib/twitch-recorder/downloads
+
+# How often to poll the Twitch Helix API, in seconds. Enforced minimum: 15.
+check_interval: 60
+
+# Length of each chunk, in seconds. Enforced minimum: 60.
+chunk_duration: 3600
+
+# streamlink quality selector and the upper bound passed to
+# --stream-sorting-excludes. See docs/CONFIGURATION.md for the caveat about
+# max_quality vs. what streamlink actually offers.
+quality: best
+max_quality: 1080p60
+
+# Optional: upload finished chunks to a Google Drive (or any rclone) remote.
+# Leave this whole section out, or leave "remote" empty, if you only use the
+# "processor" section below.
+rclone:
+  remote: gdrive
+  base_path: Twitch
+  config: /etc/twitch-recorder/rclone.conf
+  delete_after_upload: false
+  workers: 2
+
+# Optional: hand off each finished chunk to an external processor instead of
+# (or in addition to configuring) rclone. Only the exit code is inspected:
+# 0 = success, anything else = retry with exponential backoff.
+#
+# This is how twitch-recorder integrates with StreamSlice, a separate
+# project that turns raw chunks into short-form clips. See docs/DEPLOYMENT.md.
+processor:
+  command:
+    - /opt/streamslice/.venv/bin/python
+    - /opt/streamslice/tools/process_chunk_for_queue.py
+    - --config
+    - /opt/streamslice/config/remote.yaml
+  max_attempts: 8
+  retry_initial_seconds: 60
+  retry_max_seconds: 1800
+  timeout_seconds: 18000

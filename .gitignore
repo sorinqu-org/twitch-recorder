@@ -1,0 +1,21 @@
+# Production configuration and secrets - never commit these, see README.md
+config.yaml
+credentials.yaml
+twitch-credentials.yaml
+*.local.yaml
+.env
+
+# Runtime data
+downloads/
+*.mp4
+*.log
+.uploaded.json
+
+# Backup/patch artifacts left by editors and deploy scripts
+*.bak-*
+*.pre-*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
